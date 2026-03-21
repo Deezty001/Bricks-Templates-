@@ -58,11 +58,26 @@ function br_generate_page($request) {
     // Some exports are just a single element, some are an array of elements. 
     // Usually, imported elements should be inside a root array.
     $bricks_meta = is_array($bricks_data) ? $bricks_data : array($bricks_data);
+    
+    if (isset($bricks_meta['content']) && is_array($bricks_meta['content'])) {
+        $bricks_meta = $bricks_meta['content'];
+    } elseif (isset($bricks_meta['data']) && is_array($bricks_meta['data'])) {
+        $bricks_meta = $bricks_meta['data'];
+    } elseif (isset($bricks_meta['id']) && isset($bricks_meta['name'])) {
+        // Single element raw object
+        $bricks_meta = array($bricks_meta);
+    } else {
+        // Enforce sequential array to prevent associative array corruption in Bricks parser
+        $bricks_meta = array_values($bricks_meta);
+    }
 
     update_post_meta($post_id, '_bricks_page_content_2', $bricks_meta);
     
     // 3. Mark the page as being edited with Bricks so it loads the Bricks theme wrapper
     update_post_meta($post_id, '_bricks_editor_mode', 'bricks');
+    
+    // 4. Set the Page Template to "Bricks Canvas" so we get a clean component screenshot without WP Headers/Footers
+    update_post_meta($post_id, '_wp_page_template', 'template-canvas.php');
 
     // Return the permalink to the generated page
     return rest_ensure_response(array(
