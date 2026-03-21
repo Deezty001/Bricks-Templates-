@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Layers, Plus, Loader2, AlertCircle } from 'lucide-react';
+import { Layers, Plus, Loader2, AlertCircle, Search } from 'lucide-react';
 import { fetchTemplates, createTemplate, removeTemplate, restoreTemplate, permanentDeleteTemplate } from './data/mockData';
 import { Sidebar } from './components/Sidebar';
 import { TemplateGrid } from './components/TemplateGrid';
@@ -16,6 +16,7 @@ export default function App() {
   const [activeTemplate, setActiveTemplate] = useState<Template | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isTrashView, setIsTrashView] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const loadData = async () => {
@@ -40,14 +41,18 @@ export default function App() {
       const isInCurrentBin = isTrashView ? t.isTrashed === 1 : (t.isTrashed === 0 || !t.isTrashed);
       if (!isInCurrentBin) return false;
 
-      // Skip website/category filters if in Trash view for easier viewing, OR apply them
-      if (isTrashView) return true;
+      const matchSearch = t.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          t.website.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Skip website/category filters if in Trash view for easier viewing
+      if (isTrashView) return matchSearch;
 
       const matchWebsite = selectedWebsite === 'All' || t.website === selectedWebsite;
       const matchCategory = selectedCategory === 'All' || t.category === selectedCategory;
-      return matchWebsite && matchCategory;
+      
+      return matchWebsite && matchCategory && matchSearch;
     });
-  }, [templates, selectedWebsite, selectedCategory, isTrashView]);
+  }, [templates, selectedWebsite, selectedCategory, isTrashView, searchTerm]);
 
   const handleAddTemplate = async (newTemplate: Omit<Template, 'id' | 'createdAt'>): Promise<boolean> => {
     const templateWithId: Template = {
@@ -119,10 +124,22 @@ export default function App() {
             <p className="text-sm text-zinc-400 font-medium">Your premium component library</p>
           </div>
         </div>
+
+        {/* Search Bar */}
+        <div className="flex-1 max-w-xl relative group">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 group-focus-within:text-accent transition-colors" />
+          <input 
+            type="text"
+            placeholder="Search templates or websites..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-12 pr-4 py-3 bg-zinc-950/50 border border-zinc-800 rounded-xl text-zinc-200 outline-none transition-all focus:border-accent focus:ring-1 focus:ring-accent placeholder:text-zinc-600"
+          />
+        </div>
         
         <button 
           onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center gap-2 px-5 py-3 bg-accent text-white rounded-full font-semibold hover:bg-accent/90 transition-all active:scale-95 shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)]"
+          className="flex items-center gap-2 px-5 py-3 bg-accent text-white rounded-full font-semibold hover:bg-accent/90 transition-all active:scale-95 shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)] shrink-0"
         >
           <Plus className="w-5 h-5" /> New Template
         </button>
@@ -170,6 +187,7 @@ export default function App() {
         <AddTemplateModal 
           onAdd={handleAddTemplate} 
           onClose={() => setIsAddModalOpen(false)} 
+          existingCategories={categories}
         />
       )}
 

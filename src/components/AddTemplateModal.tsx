@@ -5,9 +5,10 @@ import type { Template } from '../data/mockData';
 interface AddTemplateModalProps {
   onAdd: (template: Omit<Template, 'id' | 'createdAt'>) => void;
   onClose: () => void;
+  existingCategories: string[];
 }
 
-export function AddTemplateModal({ onAdd, onClose }: AddTemplateModalProps) {
+export function AddTemplateModal({ onAdd, onClose, existingCategories }: AddTemplateModalProps) {
   const [formData, setFormData] = useState({
     title: '',
     category: 'Hero',
@@ -17,7 +18,6 @@ export function AddTemplateModal({ onAdd, onClose }: AddTemplateModalProps) {
     demoUrl: ''
   });
 
-  const categories = ['Hero', 'Pricing', 'Grid', 'Forms', 'Features', 'Testimonials', 'Header', 'Footer'];
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -61,13 +61,21 @@ export function AddTemplateModal({ onAdd, onClose }: AddTemplateModalProps) {
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-zinc-400 ml-1">Category</label>
                 <div className="relative">
-                  <select 
-                    className="w-full appearance-none px-4 py-3 bg-zinc-950/50 border border-zinc-800 rounded-xl text-zinc-200 outline-none transition-all focus:border-accent focus:ring-1 focus:ring-accent cursor-pointer"
+                  <input 
+                    list="categories-list"
+                    placeholder="Search or type category..."
+                    className="w-full px-4 py-3 bg-zinc-950/50 border border-zinc-800 rounded-xl text-zinc-200 outline-none transition-all focus:border-accent focus:ring-1 focus:ring-accent"
                     value={formData.category}
                     onChange={e => setFormData({ ...formData, category: e.target.value })}
-                  >
-                    {categories.map(cat => <option key={cat} value={cat} className="bg-zinc-900 text-zinc-100">{cat}</option>)}
-                  </select>
+                  />
+                  <datalist id="categories-list">
+                    {existingCategories.filter(c => c !== 'All').map(cat => (
+                      <option key={cat} value={cat} />
+                    ))}
+                    {['Hero', 'Pricing', 'Grid', 'Forms', 'Features', 'Testimonials', 'Header', 'Footer'].map(cat => (
+                      <option key={cat} value={cat} />
+                    ))}
+                  </datalist>
                 </div>
               </div>
               <div className="space-y-2">

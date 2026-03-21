@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Eye, Globe, Tag, Copy, Trash2, Check, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Eye, Globe, Tag, Copy, Trash2, Check, RefreshCw, AlertTriangle, Download } from 'lucide-react';
 import type { Template } from '../data/mockData';
 import { copyToClipboard } from '../utils/clipboard';
+import { downloadTemplate } from '../utils/download';
 
 interface TemplateCardProps {
   template: Template;
@@ -25,6 +26,11 @@ export function TemplateCard({ template, onClick, onDelete, onRestore, isTrashVi
     }
   };
 
+  const handleDownload = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    downloadTemplate(template.title, template.content);
+  };
+
   return (
     <div 
       onClick={onClick}
@@ -33,13 +39,22 @@ export function TemplateCard({ template, onClick, onDelete, onRestore, isTrashVi
       {/* Action Buttons Top Right */}
       <div className="absolute top-3 right-3 z-20 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
         {!isTrashView && (
-          <button 
-            onClick={handleCopy}
-            className="p-2 rounded-xl bg-zinc-950/60 backdrop-blur-md border border-white/10 text-zinc-300 hover:text-white hover:bg-zinc-900 transition-colors"
-            title="Copy Bricks Code"
-          >
-            {copied ? <Check size={16} /> : <Copy size={16} />}
-          </button>
+          <>
+            <button 
+              onClick={handleDownload}
+              className="p-2 rounded-xl bg-zinc-950/60 backdrop-blur-md border border-white/10 text-zinc-300 hover:text-white hover:bg-zinc-900 transition-colors"
+              title="Download .json file"
+            >
+              <Download size={16} />
+            </button>
+            <button 
+              onClick={handleCopy}
+              className="p-2 rounded-xl bg-zinc-950/60 backdrop-blur-md border border-white/10 text-zinc-300 hover:text-white hover:bg-zinc-900 transition-colors"
+              title="Copy Bricks Code"
+            >
+              {copied ? <Check size={16} /> : <Copy size={16} />}
+            </button>
+          </>
         )}
         
         {isTrashView && onRestore ? (
