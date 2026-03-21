@@ -1,10 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Layers, Plus, Loader2, AlertCircle, Search } from 'lucide-react';
 import { fetchTemplates, createTemplate, removeTemplate, restoreTemplate, permanentDeleteTemplate } from '../data/mockData';
 import { Sidebar } from '../components/Sidebar';
 import { TemplateGrid } from '../components/TemplateGrid';
-import { TemplateModal } from '../components/TemplateModal';
-import { AddTemplateModal } from '../components/AddTemplateModal';
+import { TemplateModal } from './TemplateModal';
+import { AddTemplateModal } from './AddTemplateModal';
+import { AuthorizeModal } from '../components/AuthorizeModal';
 import type { Template } from '../data/mockData';
 
 export function Library() {
@@ -17,6 +19,16 @@ export function Library() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isTrashView, setIsTrashView] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  
+  const handshakeId = searchParams.get('handshake');
+
+  useEffect(() => {
+    if (handshakeId) {
+      setIsAuthModalOpen(true);
+    }
+  }, [handshakeId]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -185,6 +197,21 @@ export function Library() {
           onAdd={handleAddTemplate} 
           onClose={() => setIsAddModalOpen(false)} 
           existingCategories={categories}
+        />
+      )}
+
+      {isAuthModalOpen && handshakeId && (
+        <AuthorizeModal 
+          handshakeId={handshakeId}
+          onClose={() => {
+            setIsAuthModalOpen(false);
+            setSearchParams({});
+          }}
+          onSuccess={(siteName) => {
+            alert(`Successfully connected to ${siteName}!`);
+            setIsAuthModalOpen(false);
+            setSearchParams({});
+          }}
         />
       )}
     </div>
