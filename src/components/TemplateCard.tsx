@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Eye, Globe, Tag, Copy, Trash2, Check, RefreshCw, AlertTriangle } from 'lucide-react';
 import type { Template } from '../data/mockData';
+import { copyToClipboard } from '../utils/clipboard';
 
 interface TemplateCardProps {
   template: Template;
@@ -13,11 +14,15 @@ interface TemplateCardProps {
 export function TemplateCard({ template, onClick, onDelete, onRestore, isTrashView }: TemplateCardProps) {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = (e: React.MouseEvent) => {
+  const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(template.content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const success = await copyToClipboard(template.content);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } else {
+      alert('Failed to copy to clipboard. Please try again.');
+    }
   };
 
   return (
