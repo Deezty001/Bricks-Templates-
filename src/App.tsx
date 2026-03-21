@@ -1,203 +1,39 @@
-import { useState, useMemo, useEffect } from 'react';
-import { Layers, Plus, Loader2, AlertCircle, Search } from 'lucide-react';
-import { fetchTemplates, createTemplate, removeTemplate, restoreTemplate, permanentDeleteTemplate } from './data/mockData';
-import { Sidebar } from './components/Sidebar';
-import { TemplateGrid } from './components/TemplateGrid';
-import { TemplateModal } from './components/TemplateModal';
-import { AddTemplateModal } from './components/AddTemplateModal';
-import type { Template } from './data/mockData';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { Navbar } from './components/layout/Navbar';
+import { Footer } from './components/layout/Footer';
+import { Home } from './pages/Home';
+import { Solutions } from './pages/Solutions';
+import { Pricing } from './pages/Pricing';
+import { Changelog } from './pages/Changelog';
+import { Library } from './pages/Library';
 
-export default function App() {
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedWebsite, setSelectedWebsite] = useState<string>('All');
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [activeTemplate, setActiveTemplate] = useState<Template | null>(null);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isTrashView, setIsTrashView] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const data = await fetchTemplates();
-        setTemplates(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load templates');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadData();
-  }, []);
-
-  const websites = useMemo(() => ['All', ...new Set(templates.map(t => t.website))], [templates]);
-  const categories = useMemo(() => ['All', ...new Set(templates.map(t => t.category))], [templates]);
-
-  const filteredTemplates = useMemo(() => {
-    return templates.filter(t => {
-      // Is it in the correct bin?
-      const isInCurrentBin = isTrashView ? t.isTrashed === 1 : (t.isTrashed === 0 || !t.isTrashed);
-      if (!isInCurrentBin) return false;
-
-      const matchSearch = t.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          t.website.toLowerCase().includes(searchTerm.toLowerCase());
-
-      // Skip website/category filters if in Trash view for easier viewing
-      if (isTrashView) return matchSearch;
-
-      const matchWebsite = selectedWebsite === 'All' || t.website === selectedWebsite;
-      const matchCategory = selectedCategory === 'All' || t.category === selectedCategory;
-      
-      return matchWebsite && matchCategory && matchSearch;
-    });
-  }, [templates, selectedWebsite, selectedCategory, isTrashView, searchTerm]);
-
-  const handleAddTemplate = async (newTemplate: Omit<Template, 'id' | 'createdAt'>): Promise<boolean> => {
-    const templateWithId: Template = {
-      ...newTemplate,
-      id: Math.random().toString(36).substring(2, 11) + Date.now().toString(36),
-      createdAt: Date.now(),
-      isTrashed: 0
-    };
-    
-    try {
-      const generated = await createTemplate(templateWithId);
-      
-      if (generated.imageUrl) templateWithId.imageUrl = generated.imageUrl;
-      if (generated.demoUrl) templateWithId.demoUrl = generated.demoUrl;
-      
-      setTemplates(prev => [templateWithId, ...prev]);
-      setIsAddModalOpen(false);
-      return true;
-    } catch (err) {
-      alert('Failed to save template to database');
-      return false;
-    }
-  };
-
-  const handleDeleteTemplate = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    
-    if (isTrashView) {
-      // Hard Delete
-      if (confirm('WARNING: This will permanently delete this template AND wipe the generated Bricks Page from your WordPress Render Server. This cannot be undone. Are you sure?')) {
-        try {
-          await permanentDeleteTemplate(id);
-          setTemplates(prev => prev.filter(t => t.id !== id));
-        } catch (err) {
-          alert('Failed to permanently delete template');
-        }
-      }
-    } else {
-      // Soft Delete (Trash)
-      try {
-        await removeTemplate(id);
-        setTemplates(prev => prev.map(t => t.id === id ? { ...t, isTrashed: 1 } : t));
-      } catch (err) {
-        alert('Failed to move template to trash');
-      }
-    }
-  };
-
-  const handleRestoreTemplate = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await restoreTemplate(id);
-      setTemplates(prev => prev.map(t => t.id === id ? { ...t, isTrashed: 0 } : t));
-    } catch (err) {
-      alert('Failed to restore template');
-    }
-  };
+function AppContent() {
+  const location = useLocation();
+  const isLibrary = location.pathname.startsWith('/library');
 
   return (
     <div className="min-h-screen flex flex-col bg-zinc-950 text-zinc-100 font-sans selection:bg-accent selection:text-white">
-      {/* Header */}
-      <header className="m-4 px-8 py-5 rounded-2xl flex items-center justify-between gap-4 border border-zinc-800/60 bg-zinc-900/40 backdrop-blur-xl shadow-lg">
-        <div className="flex items-center gap-4">
-          <div className="bg-accent-glow p-3 rounded-xl border border-accent/20">
-            <Layers className="w-6 h-6 text-accent" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white">Bricks Vault</h1>
-            <p className="text-sm text-zinc-400 font-medium">Your premium component library</p>
-          </div>
-        </div>
-
-        {/* Search Bar */}
-        <div className="flex-1 max-w-xl relative group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 group-focus-within:text-accent transition-colors" />
-          <input 
-            type="text"
-            placeholder="Search templates or websites..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 bg-zinc-950/50 border border-zinc-800 rounded-xl text-zinc-200 outline-none transition-all focus:border-accent focus:ring-1 focus:ring-accent placeholder:text-zinc-600"
-          />
-        </div>
-        
-        <button 
-          onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center gap-2 px-5 py-3 bg-accent text-white rounded-full font-semibold hover:bg-accent/90 transition-all active:scale-95 shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)] shrink-0"
-        >
-          <Plus className="w-5 h-5" /> New Template
-        </button>
-      </header>
-
-      {/* Main Layout */}
-      <main className="flex-1 flex gap-6 px-4 pb-4 overflow-hidden relative">
-        <Sidebar 
-          websites={websites} 
-          categories={categories}
-          selectedWebsite={selectedWebsite}
-          selectedCategory={selectedCategory}
-          onSelectWebsite={setSelectedWebsite}
-          onSelectCategory={setSelectedCategory}
-          isTrashView={isTrashView}
-          onToggleTrash={() => setIsTrashView(!isTrashView)}
-        />
-        
-        <div className="flex-1 relative overflow-y-auto hide-scrollbar scroll-smooth pr-2">
-          {isLoading ? (
-            <div className="flex-1 h-full flex flex-col items-center justify-center gap-4 text-zinc-500">
-              <Loader2 className="w-10 h-10 animate-spin text-accent" />
-              <p className="font-medium animate-pulse">Accessing the vault...</p>
-            </div>
-          ) : error ? (
-            <div className="flex-1 h-full flex flex-col items-center justify-center gap-4 text-red-400">
-              <AlertCircle className="w-10 h-10" />
-              <p className="font-medium">{error}</p>
-              <button onClick={() => window.location.reload()} className="mt-4 px-6 py-2 rounded-full border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-colors">Retry</button>
-            </div>
-          ) : (
-            <TemplateGrid 
-              templates={filteredTemplates} 
-              onSelectTemplate={setActiveTemplate} 
-              onDeleteTemplate={handleDeleteTemplate}
-              onRestoreTemplate={handleRestoreTemplate}
-              isTrashView={isTrashView}
-            />
-          )}
-        </div>
+      <Navbar />
+      
+      <main className="flex-1 flex flex-col">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/solutions" element={<Solutions />} />
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/changelog" element={<Changelog />} />
+          <Route path="/library" element={<Library />} />
+        </Routes>
       </main>
 
-      {/* Add Template Modal */}
-      {isAddModalOpen && (
-        <AddTemplateModal 
-          onAdd={handleAddTemplate} 
-          onClose={() => setIsAddModalOpen(false)} 
-          existingCategories={categories}
-        />
-      )}
-
-      {/* Full Demo Modal */}
-      {activeTemplate && (
-        <TemplateModal 
-          template={activeTemplate} 
-          onClose={() => setActiveTemplate(null)} 
-        />
-      )}
+      {!isLibrary && <Footer />}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Router>
+      <AppContent />
+    </Router>
   );
 }
