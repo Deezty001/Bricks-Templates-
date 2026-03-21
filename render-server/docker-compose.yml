@@ -10,10 +10,13 @@ services:
       WORDPRESS_DB_USER: wpuser
       WORDPRESS_DB_PASSWORD: securepassword123
       WORDPRESS_DB_NAME: render_db
+      WORDPRESS_CONFIG_EXTRA: |
+        @ini_set('upload_max_size', '64M');
+        @ini_set('post_max_size', '64M');
+        @ini_set('max_execution_time', '300');
     volumes:
       - wp_data:/var/www/html
       - ./bricks-renderer.php:/var/www/html/wp-content/plugins/bricks-renderer/bricks-renderer.php
-      - ./uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
     depends_on:
       - db
     restart: unless-stopped
