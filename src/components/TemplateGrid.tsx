@@ -4,9 +4,10 @@ import { TemplateCard } from './TemplateCard';
 interface TemplateGridProps {
   templates: Template[];
   onSelectTemplate: (template: Template) => void;
+  onDeleteTemplate: (id: string, e: React.MouseEvent) => void;
 }
 
-export function TemplateGrid({ templates, onSelectTemplate }: TemplateGridProps) {
+export function TemplateGrid({ templates, onSelectTemplate, onDeleteTemplate }: TemplateGridProps) {
   if (templates.length === 0) {
     return (
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: 'var(--text-secondary)' }}>
@@ -20,7 +21,12 @@ export function TemplateGrid({ templates, onSelectTemplate }: TemplateGridProps)
   return (
     <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '2rem', alignContent: 'start' }}>
       {templates.map(template => (
-        <TemplateCard key={template.id} template={template} onClick={() => onSelectTemplate(template)} />
+        <TemplateCard 
+          key={template.id} 
+          template={template} 
+          onClick={() => onSelectTemplate(template)} 
+          onDelete={onDeleteTemplate}
+        />
       ))}
     </div>
   );

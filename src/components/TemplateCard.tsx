@@ -1,14 +1,23 @@
 import { useState } from 'react';
-import { Eye, Globe, Tag } from 'lucide-react';
+import { Eye, Globe, Tag, Copy, Trash2, Check } from 'lucide-react';
 import type { Template } from '../data/mockData';
 
 interface TemplateCardProps {
   template: Template;
   onClick: () => void;
+  onDelete: (id: string, e: React.MouseEvent) => void;
 }
 
-export function TemplateCard({ template, onClick }: TemplateCardProps) {
+export function TemplateCard({ template, onClick, onDelete }: TemplateCardProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(template.content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <div 
@@ -22,8 +31,38 @@ export function TemplateCard({ template, onClick }: TemplateCardProps) {
         transition: 'transform var(--transition-normal), box-shadow var(--transition-normal)',
         transform: isHovered ? 'translateY(-4px)' : 'translateY(0)',
         boxShadow: isHovered ? 'var(--shadow-glow)' : 'var(--shadow-md)',
+        position: 'relative'
       }}
     >
+      {/* Action Buttons Top Right */}
+      <div style={{
+        position: 'absolute',
+        top: '1rem',
+        right: '1rem',
+        zIndex: 10,
+        display: 'flex',
+        gap: '0.5rem',
+        opacity: isHovered ? 1 : 0,
+        transition: 'opacity 0.2s'
+      }}>
+        <button 
+          onClick={handleCopy}
+          className="glass-pill" 
+          style={{ padding: '0.5rem', background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff' }}
+          title="Copy Bricks Code"
+        >
+          {copied ? <Check size={16} /> : <Copy size={16} />}
+        </button>
+        <button 
+          onClick={(e) => onDelete(template.id, e)}
+          className="glass-pill" 
+          style={{ padding: '0.5rem', background: 'rgba(255,100,100,0.2)', border: 'none', color: '#ffaaaa' }}
+          title="Delete Template"
+        >
+          <Trash2 size={16} />
+        </button>
+      </div>
+
       {/* Image Container */}
       <div style={{ position: 'relative', height: '220px', overflow: 'hidden' }}>
         <img 
