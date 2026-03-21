@@ -32,20 +32,26 @@ export const mockTemplates: Template[] = [
   }
 ];
 
-export const STORAGE_KEY = 'bricks_templates_v1';
+const API_URL = import.meta.env.PROD ? '' : 'http://localhost:8000';
 
-export const loadTemplates = (): Template[] => {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch (e) {
-      console.error('Failed to parse stored templates', e);
-    }
-  }
-  return mockTemplates;
+export const fetchTemplates = async (): Promise<Template[]> => {
+  const res = await fetch(`${API_URL}/api/templates`);
+  if (!res.ok) throw new Error('Failed to fetch templates');
+  return res.json();
 };
 
-export const saveTemplates = (templates: Template[]) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(templates));
+export const createTemplate = async (template: Template): Promise<void> => {
+  const res = await fetch(`${API_URL}/api/templates`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(template)
+  });
+  if (!res.ok) throw new Error('Failed to save template');
+};
+
+export const removeTemplate = async (id: string): Promise<void> => {
+  const res = await fetch(`${API_URL}/api/templates/${id}`, {
+    method: 'DELETE'
+  });
+  if (!res.ok) throw new Error('Failed to delete template');
 };

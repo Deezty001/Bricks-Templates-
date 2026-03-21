@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Layers, Plus } from 'lucide-react';
-import { loadTemplates, saveTemplates } from './data/mockData';
+import { Layers, Plus, Loader2, AlertCircle } from 'lucide-react';
+import { fetchTemplates, createTemplate, removeTemplate } from './data/mockData';
 import { Sidebar } from './components/Sidebar';
 import { TemplateGrid } from './components/TemplateGrid';
 import { TemplateModal } from './components/TemplateModal';
@@ -8,15 +8,27 @@ import { AddTemplateModal } from './components/AddTemplateModal';
 import type { Template } from './data/mockData';
 
 export default function App() {
-  const [templates, setTemplates] = useState<Template[]>(() => loadTemplates());
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedWebsite, setSelectedWebsite] = useState<string>('All');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [activeTemplate, setActiveTemplate] = useState<Template | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   useEffect(() => {
-    saveTemplates(templates);
-  }, [templates]);
+    const loadData = async () => {
+      try {
+        const data = await fetchTemplates();
+        setTemplates(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load templates');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadData();
+  }, []);
 
   const websites = useMemo(() => ['All', ...new Set(templates.map(t => t.website))], [templates]);
   const categories = useMemo(() => ['All', ...new Set(templates.map(t => t.category))], [templates]);
@@ -29,19 +41,31 @@ export default function App() {
     });
   }, [templates, selectedWebsite, selectedCategory]);
 
-  const handleAddTemplate = (newTemplate: Omit<Template, 'id' | 'createdAt'>) => {
+  const handleAddTemplate = async (newTemplate: Omit<Template, 'id' | 'createdAt'>) => {
     const templateWithId: Template = {
       ...newTemplate,
-      id: crypto.randomUUID(),
+      id: Math.random().toString(36).substring(2, 11) + Date.now().toString(36),
       createdAt: Date.now()
     };
-    setTemplates(prev => [templateWithId, ...prev]);
+    
+    try {
+      await createTemplate(templateWithId);
+      setTemplates(prev => [templateWithId, ...prev]);
+      setIsAddModalOpen(false);
+    } catch (err) {
+      alert('Failed to save template to database');
+    }
   };
 
-  const handleDeleteTemplate = (id: string, e: React.MouseEvent) => {
+  const handleDeleteTemplate = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm('Are you sure you want to delete this template?')) {
-      setTemplates(prev => prev.filter(t => t.id !== id));
+      try {
+        await removeTemplate(id);
+        setTemplates(prev => prev.filter(t => t.id !== id));
+      } catch (err) {
+        alert('Failed to delete template from database');
+      }
     }
   };
 
@@ -88,11 +112,24 @@ export default function App() {
           onSelectWebsite={setSelectedWebsite}
           onSelectCategory={setSelectedCategory}
         />
-        <TemplateGrid 
-          templates={filteredTemplates} 
-          onSelectTemplate={setActiveTemplate} 
-          onDeleteTemplate={handleDeleteTemplate}
-        />
+        {isLoading ? (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', color: 'var(--text-secondary)' }}>
+            <Loader2 className="spin" size={40} color="var(--accent-secondary)" />
+            <p>Accessing the vault...</p>
+          </div>
+        ) : error ? (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', color: '#ff4b4b' }}>
+            <AlertCircle size={40} />
+            <p>{error}</p>
+            <button onClick={() => window.location.reload()} className="glass-pill" style={{ marginTop: '1rem' }}>Retry</button>
+          </div>
+        ) : (
+          <TemplateGrid 
+            templates={filteredTemplates} 
+            onSelectTemplate={setActiveTemplate} 
+            onDeleteTemplate={handleDeleteTemplate}
+          />
+        )}
       </main>
 
       {/* Add Template Modal */}
