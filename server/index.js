@@ -32,20 +32,6 @@ db.exec(`
     createdAt INTEGER NOT NULL
   );
 
-  CREATE TABLE IF NOT EXISTS sites (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    url TEXT NOT NULL,
-    token TEXT NOT NULL,
-    status TEXT DEFAULT 'active',
-    createdAt INTEGER NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS handshake_requests (
-    id TEXT PRIMARY KEY,
-    siteName TEXT NOT NULL,
-    siteUrl TEXT NOT NULL,
-    expiresAt INTEGER NOT NULL
   );
 `);
 
@@ -156,110 +142,6 @@ app.delete('/api/templates/:id/permanent', async (req, res) => {
 
     db.prepare('DELETE FROM templates WHERE id = ?').run(id);
     res.json({ message: 'Permanently deleted' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// --- Magic Handshake Endpoints ---
-
-// 1. Initiate Handshake (Called by WP Plugin)
-app.post('/api/handshake', (req, res) => {
-  const { siteName, siteUrl } = req.body;
-  if (!siteName || !siteUrl) return res.status(400).json({ error: 'Missing site info' });
-
-  const id = Math.random().toString(36).substring(2, 15);
-  const expiresAt = Date.now() + (10 * 60 * 1000); // 10 minutes
-
-  try {
-    db.prepare('INSERT INTO handshake_requests (id, siteName, siteUrl, expiresAt) VALUES (?, ?, ?, ?)')
-      .run(id, siteName, siteUrl, expiresAt);
-    
-    // In a real app, this would be a URL to your vault's authorize page
-    const authUrl = `${process.env.PUBLIC_URL || 'http://localhost:5173'}/library?handshake=${id}`;
-    res.json({ handshakeId: id, authUrl });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// 2. Authorize Connection (Called by Vault UI after user approval)
-app.post('/api/remote/authorize', (req, res) => {
-  const { handshakeId } = req.body;
-  try {
-    const request = db.prepare('SELECT * FROM handshake_requests WHERE id = ?').get(handshakeId);
-    if (!request) return res.status(404).json({ error: 'Handshake request not found or expired' });
-    if (Date.now() > request.expiresAt) {
-      db.prepare('DELETE FROM handshake_requests WHERE id = ?').run(handshakeId);
-      return res.status(410).json({ error: 'Request expired' });
-    }
-
-    const siteId = Math.random().toString(36).substring(2, 15);
-    const token = 'bv_' + Math.random().toString(36).substring(2, 32) + Math.random().toString(36).substring(2, 32);
-
-    db.prepare('INSERT INTO sites (id, name, url, token, createdAt) VALUES (?, ?, ?, ?, ?)')
-      .run(siteId, request.siteName, request.siteUrl, token, Date.now());
-    
-    db.prepare('DELETE FROM handshake_requests WHERE id = ?').run(handshakeId);
-
-    // Return success AND the redirect URL for the WP admin page
-    const redirectUrl = `${request.siteUrl}/wp-admin/admin.php?page=bricks-vault-connector&token=${token}`;
-    res.json({ success: true, siteName: request.siteName, token, redirectUrl });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// 3. Remote Save (Called by WP Plugin with token)
-app.post('/api/remote/save', async (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
-  const token = authHeader.split(' ')[1];
-
-  try {
-    const site = db.prepare('SELECT * FROM sites WHERE token = ?').get(token);
-    if (!site) return res.status(401).json({ error: 'Invalid token' });
-
-    const { title, category, content } = req.body;
-    const id = Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
-    
-    // This reuse the logic from /api/templates but simplified
-    const createdAt = Date.now();
-    let imageUrl = '';
-    let demoUrl = '';
-
-    const wpRenderUrl = process.env.WP_RENDER_URL;
-    const wpRenderSecret = process.env.WP_RENDER_SECRET || 'default-secret';
-    
-    if (wpRenderUrl) {
-      const wpResponse = await fetch(wpRenderUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content, secret: wpRenderSecret })
-      });
-      const wpData = await wpResponse.json();
-      if (wpData.success && wpData.url) {
-        demoUrl = wpData.url;
-        imageUrl = wpData.url;
-      }
-    }
-
-    db.prepare(`
-      INSERT INTO templates (id, title, category, website, content, imageUrl, demoUrl, createdAt, isTrashed)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
-    `).run(id, title, category || 'Remote', site.name, content, imageUrl, demoUrl, createdAt);
-
-    res.status(201).json({ success: true, id, demoUrl });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// 4. List Connected Sites
-app.get('/api/sites', (req, res) => {
-  try {
-    const sites = db.prepare('SELECT id, name, url, createdAt FROM sites').all();
-    res.json(sites);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
