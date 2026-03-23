@@ -3,7 +3,7 @@ import type { Template } from '../data/mockData';
 import { transformBricksJson } from '../utils/bricksTransformer';
 import { copyToClipboard } from '../utils/clipboard';
 import { downloadTemplate } from '../utils/download';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 interface TemplateModalProps {
   template: Template;
@@ -37,6 +37,13 @@ export function TemplateModal({ template, onClose }: TemplateModalProps) {
     tablet: '768px',
     mobile: '375px'
   };
+
+  const previewUrl = useMemo(() => {
+    const url = new URL(template.demoUrl);
+    if (cleanVersion) url.searchParams.set('bv_clean', '1');
+    if (customClasses) url.searchParams.set('bv_classes', customClasses);
+    return url.toString();
+  }, [template.demoUrl, cleanVersion, customClasses]);
 
   return (
     <div className="fixed inset-0 z-[200] flex flex-col bg-zinc-950/95 backdrop-blur-2xl animate-fade-in">
@@ -149,9 +156,6 @@ export function TemplateModal({ template, onClose }: TemplateModalProps) {
 
         {/* Preview Area */}
         <div className="flex-1 p-8 flex flex-col items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_center,_#18181b_0%,_#09090b_100%)]">
-          <div className="mb-6 flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-950/80 border border-zinc-800/50 text-[10px] font-bold text-zinc-500 uppercase tracking-widest backdrop-blur-md">
-            Preview is unaffected by settings
-          </div>
           <div 
             className="bg-white shadow-2xl transition-all duration-500 ease-[cubic-bezier(0.16, 1, 0.3, 1)] overflow-hidden relative"
             style={{
@@ -165,7 +169,7 @@ export function TemplateModal({ template, onClose }: TemplateModalProps) {
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-[#1c1c1f] rounded-b-2xl z-20" />
           )}
           <iframe 
-            src={template.demoUrl} 
+            src={previewUrl} 
             className="w-full h-full border-none"
             title={`Demo of ${template.title}`}
           />

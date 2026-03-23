@@ -78,6 +78,37 @@ function br_generate_page($request) {
     
     // 4. Set the Page Template to "Bricks Canvas" so we get a clean component screenshot without WP Headers/Footers
     update_post_meta($post_id, '_wp_page_template', 'template-canvas.php');
+    
+    // 5. Add Live Customization Support
+    // This allows the preview to react to "Clean Version" and "Custom Classes" settings via query params
+    add_action('wp_head', function() use ($post_id) {
+        $clean = isset($_GET['bv_clean']) && $_GET['bv_clean'] === '1';
+        $classes = isset($_GET['bv_classes']) ? sanitize_text_field($_GET['bv_classes']) : '';
+        
+        if ($clean || $classes) {
+            echo '<style id="bv-customizations">';
+            if ($clean) {
+                echo '
+                body, body * { 
+                    color: #71717a !important; 
+                    background-color: transparent !important;
+                    border-color: #3f3f46 !important;
+                    font-family: monospace !important;
+                }
+                img, video, iframe { opacity: 0.2 !important; filter: grayscale(1) !important; }
+                .brxe-button, button { background: #27272a !important; border: 1px solid #3f3f46 !important; }
+                ';
+            }
+            echo '</style>';
+            
+            if ($classes) {
+                echo '<script>document.addEventListener("DOMContentLoaded", () => {
+                    const root = document.querySelector("#brx-content > *:first-child") || document.body;
+                    root.classList.add(...' . json_encode(explode(' ', $classes)) . ');
+                });</script>';
+            }
+        }
+    });
 
     // Return the permalink to the generated page
     return rest_ensure_response(array(
@@ -86,3 +117,4 @@ function br_generate_page($request) {
         'url'     => get_permalink($post_id)
     ));
 }
+
