@@ -4,6 +4,7 @@ import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
+import https from 'https';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -57,29 +58,79 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 
 // API Endpoints
+// Helper to wrap URL in proxy if needed
+const wrapInProxy = (url, req) => {
+  if (!url) return url;
+  const vaultHost = req.get('host');
+  const vaultProtocol = req.headers['x-forwarded-proto'] || req.protocol;
+  return `${vaultProtocol}://${vaultHost}/api/proxy?url=${encodeURIComponent(url)}`;
+};
+
+// API Endpoints
 app.get('/api/templates', (req, res) => {
   try {
     const templates = db.prepare('SELECT * FROM templates ORDER BY createdAt DESC').all();
-    const vaultProtocol = req.headers['x-forwarded-proto'] || req.protocol;
     
-    // Dynamically match protocol for all templates to avoid Mixed Content errors
-    const transformed = templates.map(t => {
-      let updated = { ...t };
-      if (vaultProtocol === 'https') {
-        if (updated.demoUrl && updated.demoUrl.startsWith('http://')) {
-          updated.demoUrl = updated.demoUrl.replace('http://', 'https://');
-        }
-        if (updated.imageUrl && updated.imageUrl.startsWith('http://')) {
-          updated.imageUrl = updated.imageUrl.replace('http://', 'https://');
-        }
-      }
-      return updated;
-    });
+    // Wrap URLs in our proxy to bypass Mixed Content and SSL certificate issues
+    const transformed = templates.map(t => ({
+      ...t,
+      demoUrl: wrapInProxy(t.demoUrl, req),
+      imageUrl: wrapInProxy(t.imageUrl, req)
+    }));
     
     res.json(transformed);
   } catch (error) {
     console.error('Fetch Error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Smart Proxy Endpoint
+app.get('/api/proxy', async (req, res) => {
+  const targetUrl = req.query.url;
+  if (!targetUrl) return res.status(400).send('URL required');
+
+  try {
+    // We use the basic fetch but tell it to ignore SSL errors for internal/sslip.io addresses
+    // For Node 20+, we can use a custom dispatcher or just allow unauthorized globally for this request
+    const response = await fetch(targetUrl, {
+      // This is a workaround for Node's fetch to ignore SSL errors without a complex dispatcher
+      dispatcher: new (await import('undici')).Agent({
+        connect: {
+          rejectUnauthorized: false
+        }
+      })
+    });
+
+    const contentType = response.headers.get('content-type');
+    if (contentType) res.setHeader('Content-Type', contentType);
+    
+    // For HTML, we rewrite absolute URLs to also go through this proxy
+    if (contentType && contentType.includes('text/html')) {
+       let html = await response.text();
+       const baseUrl = new URL(targetUrl).origin;
+       
+       const vaultHost = req.get('host');
+       const vaultProtocol = req.headers['x-forwarded-proto'] || req.protocol;
+       const proxyBase = `${vaultProtocol}://${vaultHost}/api/proxy?url=`;
+       
+       // Rewrite all absolute links to the render server to go through our proxy
+       // This fixes Mixed Content for CSS/JS/Images
+       html = html.split(baseUrl).join(proxyBase + encodeURIComponent(baseUrl));
+       
+       // Also add a <base> tag just in case there are relative links
+       if (!html.includes('<base')) {
+         html = html.replace('<head>', `<head><base href="${baseUrl}/">`);
+       }
+       
+       res.send(html);
+    } else {
+       const buffer = await response.arrayBuffer();
+       res.send(Buffer.from(buffer));
+    }
+  } catch (err) {
+    console.error('Proxy Error:', err.message);
+    res.status(500).send(`Proxy Error: ${err.message}`);
   }
 });
 
@@ -101,18 +152,8 @@ app.post('/api/templates', authenticate, async (req, res) => {
       const wpData = await wpResponse.json();
       
       if (wpData.success && wpData.url) {
-        let generatedUrl = wpData.url;
-        
-        // Protocol Matching: If the vault is running on HTTPS, ensure the demoUrl is also HTTPS
-        // to avoid Mixed Content errors in the browser.
-        const vaultProtocol = req.headers['x-forwarded-proto'] || req.protocol;
-        if (vaultProtocol === 'https' && generatedUrl.startsWith('http://')) {
-          generatedUrl = generatedUrl.replace('http://', 'https://');
-          console.log('Protocol matched to HTTPS:', generatedUrl);
-        }
-        
-        demoUrl = generatedUrl;
-        imageUrl = generatedUrl; 
+        demoUrl = wpData.url;
+        imageUrl = wpData.url; 
         console.log('Demo generated:', demoUrl);
       } else {
         console.error('WP Render Server returned an error:', wpData);
