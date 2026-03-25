@@ -1,3 +1,4 @@
+// BUILD_VER_FINAL_1
 import { useState, useMemo, useEffect } from 'react';
 import { Layers, Plus, Loader2, AlertCircle, Search } from 'lucide-react';
 import { fetchTemplates, createTemplate, removeTemplate, restoreTemplate, permanentDeleteTemplate, generateId } from '../data/apiClient';
