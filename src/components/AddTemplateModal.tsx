@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { X, Plus, Loader2 } from 'lucide-react';
-import type { Template } from '../data/apiClient';
+import type { Template } from '../data/mockData';
 
 interface AddTemplateModalProps {
   onAdd: (template: Omit<Template, 'id' | 'createdAt'>) => void;
