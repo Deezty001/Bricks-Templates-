@@ -109,19 +109,60 @@ app.get('/api/proxy', async (req, res) => {
     // For HTML, we rewrite absolute URLs to also go through this proxy
     if (contentType && contentType.includes('text/html')) {
        let html = await response.text();
-       const baseUrl = new URL(targetUrl).origin;
+       const baseUrl = new URL(url).origin;
        
        const vaultHost = req.get('host');
        const vaultProtocol = req.headers['x-forwarded-proto'] || req.protocol;
        const proxyBase = `${vaultProtocol}://${vaultHost}/api/proxy?url=`;
        
-       // Rewrite all absolute links to the render server to go through our proxy
-       // This fixes Mixed Content for CSS/JS/Images
+       // 1. Rewrite absolute links
        html = html.split(baseUrl).join(proxyBase + encodeURIComponent(baseUrl));
        
-       // Also add a <base> tag just in case there are relative links
        if (!html.includes('<base')) {
          html = html.replace('<head>', `<head><base href="${baseUrl}/">`);
+       }
+
+       // 2. Inject "Clean Version" logic if requested
+       if (params.bv_clean === '1') {
+         const cleanStyle = `
+           <style id="bv-clean-mode">
+             #brx-content, #brx-content *, .brx-body, .brx-body * { 
+                 color: #71717a !important; 
+                 background-color: transparent !important;
+                 background-image: none !important;
+                 border-color: #3f3f46 !important;
+                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+                 box-shadow: none !important;
+                 text-shadow: none !important;
+                 fill: #71717a !important;
+             }
+             img, video, iframe, svg:not(.lucide) { 
+                 opacity: 0.1 !important; 
+                 filter: grayscale(1) brightness(0.5) !important; 
+             }
+             .brxe-button, button { 
+                 background: #27272a !important; 
+                 border: 1px solid #3f3f46 !important; 
+                 color: #ffffff !important;
+             }
+           </style>
+         `;
+         html = html.replace('</head>', `${cleanStyle}</head>`);
+       }
+
+       // 3. Inject "Custom Classes" if requested
+       if (params.bv_classes) {
+         const classes = params.bv_classes.split(' ').filter(Boolean);
+         const classScript = `
+           <script id="bv-class-injection">
+             window.addEventListener('DOMContentLoaded', () => {
+               const root = document.querySelector("#brx-content > *:first-child") || document.body;
+               const classes = ${JSON.stringify(classes)};
+               if (root && classes.length) root.classList.add(...classes);
+             });
+           </script>
+         `;
+         html = html.replace('</body>', `${classScript}</body>`);
        }
        
        res.send(html);
