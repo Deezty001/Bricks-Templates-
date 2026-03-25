@@ -11,6 +11,7 @@ const __dirname = dirname(__filename);
 const app = express();
 const port = process.env.PORT || 8080;
 // API_KEY Check Removed by Request
+app.set('trust proxy', true);
 
 // Database setup
 const dataDir = join(__dirname, '../data');
@@ -84,8 +85,18 @@ app.post('/api/templates', authenticate, async (req, res) => {
       const wpData = await wpResponse.json();
       
       if (wpData.success && wpData.url) {
-        demoUrl = wpData.url;
-        imageUrl = wpData.url; // Use demoUrl as imageUrl for backwards compatibility
+        let generatedUrl = wpData.url;
+        
+        // Protocol Matching: If the vault is running on HTTPS, ensure the demoUrl is also HTTPS
+        // to avoid Mixed Content errors in the browser.
+        const vaultProtocol = req.headers['x-forwarded-proto'] || req.protocol;
+        if (vaultProtocol === 'https' && generatedUrl.startsWith('http://')) {
+          generatedUrl = generatedUrl.replace('http://', 'https://');
+          console.log('Protocol matched to HTTPS:', generatedUrl);
+        }
+        
+        demoUrl = generatedUrl;
+        imageUrl = generatedUrl; 
         console.log('Demo generated:', demoUrl);
       } else {
         console.error('WP Render Server returned an error:', wpData);

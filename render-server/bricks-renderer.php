@@ -22,6 +22,60 @@ add_action('rest_api_init', function () {
     ));
 });
 
+// 1. GLOBAL SECURITY BYPASS FOR IFRAMING
+// This allows the Vault application to embed the demo pages regardless of security audit settings.
+add_action('template_redirect', function() {
+    // Remove the SAMEORIGIN restriction if it exists
+    header_remove('X-Frame-Options');
+    // Allow the page to be loaded in an iframe by any origin (or you can restrict to your vault domain)
+    header("Content-Security-Policy: frame-ancestors *");
+    // Explicitly allow CORS for the preview
+    header("Access-Control-Allow-Origin: *");
+});
+
+// 2. LIVE CUSTOMIZATION SUPPORT
+// Moved to top-level so it runs when the page is actually viewed, not just created.
+add_action('wp_head', function() {
+    $clean = isset($_GET['bv_clean']) && $_GET['bv_clean'] === '1';
+    $classes_raw = isset($_GET['bv_classes']) ? sanitize_text_field($_GET['bv_classes']) : '';
+    
+    if ($clean || $classes_raw) {
+        echo '<style id="bv-customizations">';
+        if ($clean) {
+            echo '
+            body, body * { 
+                color: #71717a !important; 
+                background-color: transparent !important;
+                border-color: #3f3f46 !important;
+                font-family: monospace !important;
+            }
+            img, video, iframe { opacity: 0.2 !important; filter: grayscale(1) !important; }
+            .brxe-button, button { background: #27272a !important; border: 1px solid #3f3f46 !important; }
+            ';
+        }
+        echo '</style>';
+        
+        if (!empty($classes_raw)) {
+            $classes_array = array_filter(explode(' ', $classes_raw));
+            $classes_array = array_map(function($c) {
+                return preg_replace('/[^a-zA-Z0-9-]/', '', $c);
+            }, $classes_array);
+            $classes_array = array_filter($classes_array);
+
+            if (!empty($classes_array)) {
+                printf(
+                    '<script id="bv-class-injection">window.addEventListener("DOMContentLoaded", () => {
+                        const root = document.querySelector("#brx-content > *:first-child") || document.body;
+                        const classes = %s;
+                        root.classList.add(...classes);
+                    });</script>',
+                    wp_json_encode(array_values($classes_array))
+                );
+            }
+        }
+    }
+});
+
 function br_verify_secret_token($request) {
     if ($request->get_method() === 'GET') return true; 
 
@@ -85,47 +139,7 @@ function br_generate_page($request) {
     update_post_meta($post_id, '_wp_page_template', 'template-canvas.php');
     
     // 3. Add Live Customization Support
-    add_action('wp_head', function() {
-        $clean = isset($_GET['bv_clean']) && $_GET['bv_clean'] === '1';
-        $classes_raw = isset($_GET['bv_classes']) ? sanitize_text_field($_GET['bv_classes']) : '';
-        
-        if ($clean || $classes_raw) {
-            echo '<style id="bv-customizations">';
-            if ($clean) {
-                echo '
-                body, body * { 
-                    color: #71717a !important; 
-                    background-color: transparent !important;
-                    border-color: #3f3f46 !important;
-                    font-family: monospace !important;
-                }
-                img, video, iframe { opacity: 0.2 !important; filter: grayscale(1) !important; }
-                .brxe-button, button { background: #27272a !important; border: 1px solid #3f3f46 !important; }
-                ';
-            }
-            echo '</style>';
-            
-            if (!empty($classes_raw)) {
-                $classes_array = array_filter(explode(' ', $classes_raw));
-                // Harden: Only allow alphanumeric and hyphens in class names
-                $classes_array = array_map(function($c) {
-                    return preg_replace('/[^a-zA-Z0-9-]/', '', $c);
-                }, $classes_array);
-                $classes_array = array_filter($classes_array);
-
-                if (!empty($classes_array)) {
-                    printf(
-                        '<script id="bv-class-injection">window.addEventListener("DOMContentLoaded", () => {
-                            const root = document.querySelector("#brx-content > *:first-child") || document.body;
-                            const classes = %s;
-                            root.classList.add(...classes);
-                        });</script>',
-                        wp_json_encode(array_values($classes_array))
-                    );
-                }
-            }
-        }
-    });
+    // Logic moved to top-level wp_head hook for reliability
 
     // Return the permalink to the generated page
     return rest_ensure_response(array(
