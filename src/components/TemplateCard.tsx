@@ -94,10 +94,10 @@ export function TemplateCard({ template, onClick, onDelete, onRestore, isTrashVi
           title={template.title}
           loading="lazy"
           scrolling="no"
-          className="absolute origin-top-left pointer-events-none transition-all duration-700 ease-in-out group-hover:opacity-40 group-hover:scale-[0.26]"
+          className="absolute top-0 left-0 origin-top-left pointer-events-none transition-all duration-700 ease-in-out group-hover:opacity-40"
           style={{ 
-            width: '1280px', 
-            height: '800px', 
+            width: '400%', 
+            height: '400%', 
             border: 'none',
             transform: 'scale(0.25)', 
           }}
