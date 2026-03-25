@@ -40,17 +40,32 @@ add_action('wp_head', function() {
     $classes_raw = isset($_GET['bv_classes']) ? sanitize_text_field($_GET['bv_classes']) : '';
     
     if ($clean || $classes_raw) {
-        echo '<style id="bv-customizations">';
+        echo '<style id="bv-customizations">
+        ';
         if ($clean) {
             echo '
-            body, body * { 
+            /* Force inheritance and strip background/colors */
+            #brx-content, #brx-content *, .brx-body, .brx-body * { 
                 color: #71717a !important; 
                 background-color: transparent !important;
+                background-image: none !important;
                 border-color: #3f3f46 !important;
-                font-family: monospace !important;
+                font-family: "Inter", sans-serif !important;
+                box-shadow: none !important;
+                text-shadow: none !important;
+                fill: #71717a !important;
             }
-            img, video, iframe { opacity: 0.2 !important; filter: grayscale(1) !important; }
-            .brxe-button, button { background: #27272a !important; border: 1px solid #3f3f46 !important; }
+            /* Strip images and media */
+            img, video, iframe, svg:not(.lucide) { 
+                opacity: 0.1 !important; 
+                filter: grayscale(1) brightness(0.5) !important; 
+            }
+            /* Normalize buttons */
+            .brxe-button, button { 
+                background: #27272a !important; 
+                border: 1px solid #3f3f46 !important; 
+                color: #ffffff !important;
+            }
             ';
         }
         echo '</style>';
