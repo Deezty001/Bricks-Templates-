@@ -60,7 +60,23 @@ app.use(express.json({ limit: '50mb' }));
 app.get('/api/templates', (req, res) => {
   try {
     const templates = db.prepare('SELECT * FROM templates ORDER BY createdAt DESC').all();
-    res.json(templates);
+    const vaultProtocol = req.headers['x-forwarded-proto'] || req.protocol;
+    
+    // Dynamically match protocol for all templates to avoid Mixed Content errors
+    const transformed = templates.map(t => {
+      let updated = { ...t };
+      if (vaultProtocol === 'https') {
+        if (updated.demoUrl && updated.demoUrl.startsWith('http://')) {
+          updated.demoUrl = updated.demoUrl.replace('http://', 'https://');
+        }
+        if (updated.imageUrl && updated.imageUrl.startsWith('http://')) {
+          updated.imageUrl = updated.imageUrl.replace('http://', 'https://');
+        }
+      }
+      return updated;
+    });
+    
+    res.json(transformed);
   } catch (error) {
     console.error('Fetch Error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
